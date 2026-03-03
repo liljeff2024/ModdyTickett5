@@ -1,9 +1,14 @@
+from dotenv import load_dotenv
+import os
 import discord
 from discord.ext import commands
 import json
 import asyncio
 import traceback
-import os
+
+load_dotenv()
+TOKEN = os.getnev("TOKEN")
+
 
 # ============================================================
 #   CARGAR CONFIG
