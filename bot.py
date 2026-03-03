@@ -4,7 +4,6 @@ import json
 import asyncio
 import traceback
 import os
-from server import keep_alive
 
 # ============================================================
 #   CARGAR CONFIG
@@ -143,5 +142,4 @@ async def main():
 #   EJECUTAR BOT
 # ============================================================
 
-keep_alive()
 asyncio.run(main())
