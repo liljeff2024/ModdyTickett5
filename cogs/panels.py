@@ -120,6 +120,10 @@ class SelectPanel(discord.ui.Select):
             emoji=opcion.emoji
         )
 
+        # 🔥 Permitir uso infinito del select
+        self.values.clear()
+        await interaction.message.edit(view=self.view)
+
 class VistaPanelMenu(discord.ui.View):
     def __init__(self, panel_id, opciones_menu):
         super().__init__(timeout=None)
@@ -140,8 +144,6 @@ class VistaPanel(discord.ui.View):
                 value=b.get("value") or b["label"]
             ))
 
-
-
 # ============================================================
 #   COG PRINCIPAL
 # ============================================================
@@ -156,57 +158,10 @@ class Panels(commands.Cog):
         pid = str(panel_id)
         return data.get(guild, {}).get(pid)
 
-    # ============================================================
-    #   CREAR PANEL
-    # ============================================================
 
-    @app_commands.command(name="panel_crear", description="Crea un panel vacío.")
-    async def panel_crear(self, interaction: discord.Interaction, panel_id: int):
-        data = cargar_paneles()
-        guild = str(interaction.guild.id)
-        pid = str(panel_id)
 
-        if guild not in data:
-            data[guild] = {}
 
-        if pid in data[guild]:
-            return await interaction.response.send_message("❌ Ese panel ya existe.", ephemeral=True)
-
-        data[guild][pid] = {
-            "titulo": "🎫 Panel de Tickets",
-            "descripcion": "Pulsa un botón para abrir un ticket.",
-            "color": "#5865F2",
-            "botones": [],
-            "menu": []
-        }
-
-        guardar_paneles(data)
-        await interaction.response.send_message("✔ Panel creado.", ephemeral=True)
-
-    # ============================================================
-    #   EDITAR PANEL
-    # ============================================================
-
-    @app_commands.command(name="panel_editar", description="Edita el embed del panel.")
-    async def panel_editar(self, interaction: discord.Interaction, panel_id: int, titulo: str = None, descripcion: str = None, color: str = None):
-        data = cargar_paneles()
-        guild = str(interaction.guild.id)
-        pid = str(panel_id)
-
-        if guild not in data or pid not in data[guild]:
-            return await interaction.response.send_message("❌ Ese panel no existe.", ephemeral=True)
-
-        if titulo:
-            data[guild][pid]["titulo"] = titulo
-        if descripcion:
-            data[guild][pid]["descripcion"] = descripcion
-        if color:
-            data[guild][pid]["color"] = color
-
-        guardar_paneles(data)
-        await interaction.response.send_message("✔ Panel actualizado.", ephemeral=True)
-
-    # ============================================================
+# ============================================================
     #   AÑADIR BOTÓN
     # ============================================================
 
@@ -227,6 +182,30 @@ class Panels(commands.Cog):
 
         guardar_paneles(data)
         await interaction.response.send_message("✔ Botón añadido.", ephemeral=True)
+
+    # ============================================================
+    #   BORRAR BOTÓN (NUEVO)
+    # ============================================================
+
+    @app_commands.command(name="panel_boton_borrar", description="Borra un botón del panel.")
+    async def panel_boton_borrar(self, interaction: discord.Interaction, panel_id: int, valor: str):
+        data = cargar_paneles()
+        guild = str(interaction.guild.id)
+        pid = str(panel_id)
+
+        if guild not in data or pid not in data[guild]:
+            return await interaction.response.send_message("❌ Ese panel no existe.", ephemeral=True)
+
+        botones = data[guild][pid]["botones"]
+        nuevos = [b for b in botones if b["value"] != valor]
+
+        if len(nuevos) == len(botones):
+            return await interaction.response.send_message("❌ No existe un botón con ese valor.", ephemeral=True)
+
+        data[guild][pid]["botones"] = nuevos
+        guardar_paneles(data)
+
+        await interaction.response.send_message("🗑️ Botón eliminado.", ephemeral=True)
 
     # ============================================================
     #   AÑADIR OPCIÓN AL MENÚ
@@ -250,6 +229,30 @@ class Panels(commands.Cog):
 
         guardar_paneles(data)
         await interaction.response.send_message("✔ Opción añadida al menú.", ephemeral=True)
+
+    # ============================================================
+    #   BORRAR OPCIÓN DEL MENÚ (NUEVO)
+    # ============================================================
+
+    @app_commands.command(name="panel_menu_borrar", description="Borra una opción del menú.")
+    async def panel_menu_borrar(self, interaction: discord.Interaction, panel_id: int, valor: str):
+        data = cargar_paneles()
+        guild = str(interaction.guild.id)
+        pid = str(panel_id)
+
+        if guild not in data or pid not in data[guild]:
+            return await interaction.response.send_message("❌ Ese panel no existe.", ephemeral=True)
+
+        menu = data[guild][pid]["menu"]
+        nuevos = [m for m in menu if m["value"] != valor]
+
+        if len(nuevos) == len(menu):
+            return await interaction.response.send_message("❌ No existe una opción con ese valor.", ephemeral=True)
+
+        data[guild][pid]["menu"] = nuevos
+        guardar_paneles(data)
+
+        await interaction.response.send_message("🗑️ Opción eliminada del menú.", ephemeral=True)
 
     # ============================================================
     #   ENVIAR PANEL CON MENÚ
@@ -347,9 +350,7 @@ async def setup(bot):
     for guild_id, guild_panels in data.items():
         for panel_id, panel in guild_panels.items():
 
-            # Registrar botones persistentes
             bot.add_view(VistaPanel(panel_id, panel))
 
-            # Registrar menú persistente
             if "menu" in panel and panel["menu"]:
                 bot.add_view(VistaPanelMenu(panel_id, panel["menu"]))
