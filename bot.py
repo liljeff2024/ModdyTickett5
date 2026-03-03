@@ -6,24 +6,29 @@ import json
 import asyncio
 import traceback
 
+# ============================================
+#   CARGAR ENV
+# ============================================
 load_dotenv()
-TOKEN = os.getnev("TOKEN")
 
+# Forzar a discord.py a NO usar aiohttp
+discord.http._set_default_http_client("httpx")
 
-# ============================================================
+# TOKEN desde entorno
+TOKEN = os.getenv("TOKEN")
+
+# ============================================
 #   CARGAR CONFIG
-# ============================================================
-
-with open("config.json", "r", encoding="utf-8") as f:
+# ============================================
+with open("data/config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 
 # TOKEN desde Render (sobrescribe el del config.json)
 TOKEN = os.getenv("TOKEN") or config["TOKEN"]
 
-# ============================================================
+# ============================================
 #   INTENTS Y BOT
-# ============================================================
-
+# ============================================
 intents = discord.Intents.all()
 
 class TicketBot(commands.Bot):
@@ -50,6 +55,7 @@ class TicketBot(commands.Bot):
                 print(f"\n❌ ERROR cargando {cog}:")
                 traceback.print_exc()
 
+        # Registrar vistas persistentes
         try:
             from cogs.tickets import VistaCierreFinal
             self.add_view(VistaCierreFinal())
@@ -71,6 +77,7 @@ class TicketBot(commands.Bot):
             print("❌ Error registrando vistas de paneles:")
             traceback.print_exc()
 
+        # Sincronizar comandos
         try:
             synced = await self.tree.sync()
             print(f"🔧 {len(synced)} comandos sincronizados.")
@@ -81,34 +88,29 @@ class TicketBot(commands.Bot):
 
 bot = TicketBot()
 
-# ============================================================
+# ============================================
 #   EVENTO ON_READY
-# ============================================================
-
+# ============================================
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
 
-# ============================================================
-#   SISTEMA PRO DE ERRORES
-# ============================================================
-
+# ============================================
+#   SISTEMA DE ERRORES
+# ============================================
 @bot.event
 async def on_command_error(ctx, error):
     print("\n❌ ERROR EN COMANDO:")
     traceback.print_exc()
-
     try:
         await ctx.reply("❌ Ocurrió un error ejecutando este comando.")
     except:
         pass
 
-
 @bot.tree.error
 async def on_app_command_error(interaction, error):
     print("\n❌ ERROR EN SLASH COMMAND:")
     traceback.print_exc()
-
     try:
         await interaction.response.send_message(
             "❌ Ocurrió un error ejecutando este comando.",
@@ -116,7 +118,6 @@ async def on_app_command_error(interaction, error):
         )
     except:
         pass
-
 
 @bot.event
 async def on_error(event, *args, **kwargs):
@@ -131,10 +132,9 @@ async def on_error(event, *args, **kwargs):
 
     traceback.print_exc()
 
-# ============================================================
+# ============================================
 #   MAIN
-# ============================================================
-
+# ============================================
 async def main():
     try:
         async with bot:
@@ -143,8 +143,7 @@ async def main():
         print("\n❌ ERROR AL INICIAR EL BOT:")
         traceback.print_exc()
 
-# ============================================================
+# ============================================
 #   EJECUTAR BOT
-# ============================================================
-
+# ============================================
 asyncio.run(main())
