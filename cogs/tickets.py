@@ -452,9 +452,37 @@ class Tickets(commands.Cog):
         self.bot = bot
         self.config = load_json(CONFIG_PATH)
 
+    # ============================================================
+    #   GUARDAR CONFIG
+    # ============================================================
     def save_config(self):
         save_json(CONFIG_PATH, self.config)
         self.config = load_json(CONFIG_PATH)
+
+    # ============================================================
+    #   OBTENER CONFIG (EL QUE TE FALTABA)
+    # ============================================================
+    def get_config(self, guild_id, panel_id):
+        guild = str(guild_id)
+        pid = str(panel_id)
+
+        # Crear estructura si no existe
+        if guild not in self.config:
+            self.config[guild] = {}
+
+        if pid not in self.config[guild]:
+            self.config[guild][pid] = {
+                "staff_roles": [],
+                "categoria_id": None,
+                "logs_id": None,
+                "valoraciones_id": None,
+                "razon_obligatoria": True,
+                "notificar_habilitado": True,
+                "notificar_cooldown": 5
+            }
+            self.save_config()
+
+        return self.config[guild][pid]
 
 
 
