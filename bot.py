@@ -11,8 +11,6 @@ import traceback
 # ============================================
 load_dotenv()
 
-# Forzar a discord.py a NO usar aiohttp
-discord.http._set_default_http_client("httpx")
 
 # TOKEN desde entorno
 TOKEN = os.getenv("TOKEN")
