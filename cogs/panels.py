@@ -91,6 +91,7 @@ class BotonPanel(discord.ui.Button):
 class SelectPanel(discord.ui.Select):
     def __init__(self, panel_id, opciones_menu):
         self.panel_id = panel_id
+        self.opciones_menu = opciones_menu  # 🔥 Guardamos los datos reales
 
         opciones = [
             discord.SelectOption(
@@ -114,7 +115,8 @@ class SelectPanel(discord.ui.Select):
 
         await interaction.response.defer(ephemeral=True)
 
-        opcion = next(o for o in self.options if o.value == self.values[0])
+        # 🔥 Recuperamos la opción REAL con emoji incluido
+        opcion = next(o for o in self.opciones_menu if o["value"] == self.values[0])
 
         cog = interaction.client.get_cog("Tickets")
         if not cog:
@@ -123,14 +125,15 @@ class SelectPanel(discord.ui.Select):
         await cog.crear_ticket(
             interaction,
             panel_id=self.panel_id,
-            label=opcion.label,
-            emoji=opcion.emoji
+            label=opcion["label"],
+            emoji=opcion.get("emoji")
         )
 
+        # 🔥 Reset sin romper la vista persistente
         self.values.clear()
-        await interaction.message.edit(view=self.view)
 
         await interaction.followup.send("✔ Ticket creado.", ephemeral=True)
+    
 
 
 class VistaPanelMenu(discord.ui.View):
