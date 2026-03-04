@@ -69,9 +69,11 @@ class BotonPanel(discord.ui.Button):
         self.value = value
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
         cog = interaction.client.get_cog("Tickets")
         if not cog:
-            return await interaction.response.send_message("❌ Sistema de tickets no cargado.", ephemeral=True)
+            return await interaction.followup.send("❌ Sistema de tickets no cargado.", ephemeral=True)
 
         await cog.crear_ticket(
             interaction,
@@ -80,8 +82,10 @@ class BotonPanel(discord.ui.Button):
             emoji=self.emoji_text
         )
 
+        await interaction.followup.send("✔ Ticket creado.", ephemeral=True)
+
 # ============================================================
-#   MENÚ SELECT (PERSISTENTE)
+#   MENÚ SELECT (PERSISTENTE Y ARREGLADO)
 # ============================================================
 
 class SelectPanel(discord.ui.Select):
@@ -107,11 +111,14 @@ class SelectPanel(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+
+        await interaction.response.defer(ephemeral=True)
+
         opcion = next(o for o in self.options if o.value == self.values[0])
 
         cog = interaction.client.get_cog("Tickets")
         if not cog:
-            return await interaction.response.send_message("❌ Sistema de tickets no cargado.", ephemeral=True)
+            return await interaction.followup.send("❌ Sistema de tickets no cargado.", ephemeral=True)
 
         await cog.crear_ticket(
             interaction,
@@ -120,9 +127,11 @@ class SelectPanel(discord.ui.Select):
             emoji=opcion.emoji
         )
 
-        # 🔥 Permitir uso infinito del select
+        # 🔥 Reset para uso infinito
         self.values.clear()
         await interaction.message.edit(view=self.view)
+
+        await interaction.followup.send("✔ Ticket creado.", ephemeral=True)
 
 class VistaPanelMenu(discord.ui.View):
     def __init__(self, panel_id, opciones_menu):
@@ -130,7 +139,7 @@ class VistaPanelMenu(discord.ui.View):
         self.add_item(SelectPanel(panel_id, opciones_menu))
 
 # ============================================================
-#   VISTA BOTONES
+#   VISTA BOTONES (PERSISTENTE)
 # ============================================================
 
 class VistaPanel(discord.ui.View):
@@ -143,6 +152,8 @@ class VistaPanel(discord.ui.View):
                 emoji=b.get("emoji"),
                 value=b.get("value") or b["label"]
             ))
+
+
 
 # ============================================================
 #   COG PRINCIPAL
@@ -158,10 +169,7 @@ class Panels(commands.Cog):
         pid = str(panel_id)
         return data.get(guild, {}).get(pid)
 
-
-
-
-# ============================================================
+    # ============================================================
     #   AÑADIR BOTÓN
     # ============================================================
 
@@ -184,7 +192,7 @@ class Panels(commands.Cog):
         await interaction.response.send_message("✔ Botón añadido.", ephemeral=True)
 
     # ============================================================
-    #   BORRAR BOTÓN (NUEVO)
+    #   BORRAR BOTÓN
     # ============================================================
 
     @app_commands.command(name="panel_boton_borrar", description="Borra un botón del panel.")
@@ -231,7 +239,7 @@ class Panels(commands.Cog):
         await interaction.response.send_message("✔ Opción añadida al menú.", ephemeral=True)
 
     # ============================================================
-    #   BORRAR OPCIÓN DEL MENÚ (NUEVO)
+    #   BORRAR OPCIÓN DEL MENÚ
     # ============================================================
 
     @app_commands.command(name="panel_menu_borrar", description="Borra una opción del menú.")
@@ -350,7 +358,9 @@ async def setup(bot):
     for guild_id, guild_panels in data.items():
         for panel_id, panel in guild_panels.items():
 
+            
             bot.add_view(VistaPanel(panel_id, panel))
 
+            
             if "menu" in panel and panel["menu"]:
                 bot.add_view(VistaPanelMenu(panel_id, panel["menu"]))
