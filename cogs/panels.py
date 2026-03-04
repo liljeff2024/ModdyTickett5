@@ -85,7 +85,7 @@ class BotonPanel(discord.ui.Button):
         await interaction.followup.send("✔ Ticket creado.", ephemeral=True)
 
 # ============================================================
-#   MENÚ SELECT (PERSISTENTE Y ARREGLADO)
+#   MENÚ SELECT (PERSISTENTE)
 # ============================================================
 
 class SelectPanel(discord.ui.Select):
@@ -127,11 +127,11 @@ class SelectPanel(discord.ui.Select):
             emoji=opcion.emoji
         )
 
-        # 🔥 Reset para uso infinito
         self.values.clear()
         await interaction.message.edit(view=self.view)
 
         await interaction.followup.send("✔ Ticket creado.", ephemeral=True)
+
 
 class VistaPanelMenu(discord.ui.View):
     def __init__(self, panel_id, opciones_menu):
@@ -153,8 +153,6 @@ class VistaPanel(discord.ui.View):
                 value=b.get("value") or b["label"]
             ))
 
-
-
 # ============================================================
 #   COG PRINCIPAL
 # ============================================================
@@ -168,6 +166,37 @@ class Panels(commands.Cog):
         guild = str(guild_id)
         pid = str(panel_id)
         return data.get(guild, {}).get(pid)
+
+    # ============================================================
+    #   PANEL CREAR (AÑADIDO Y FUNCIONAL)
+    # ============================================================
+
+    @app_commands.command(name="panel_crear", description="Crea un panel vacío para configurarlo.")
+    async def panel_crear(self, interaction: discord.Interaction, panel_id: int, titulo: str, descripcion: str, color: str = "#3498db"):
+        data = cargar_paneles()
+        guild = str(interaction.guild.id)
+        pid = str(panel_id)
+
+        if guild not in data:
+            data[guild] = {}
+
+        if pid in data[guild]:
+            return await interaction.response.send_message("❌ Ese panel ya existe.", ephemeral=True)
+
+        data[guild][pid] = {
+            "titulo": titulo,
+            "descripcion": descripcion,
+            "color": color,
+            "botones": [],
+            "menu": []
+        }
+
+        guardar_paneles(data)
+
+        await interaction.response.send_message(
+            f"✔ Panel **{panel_id}** creado. Ahora puedes añadir botones o menú.",
+            ephemeral=True
+        )
 
     # ============================================================
     #   AÑADIR BOTÓN
@@ -191,7 +220,9 @@ class Panels(commands.Cog):
         guardar_paneles(data)
         await interaction.response.send_message("✔ Botón añadido.", ephemeral=True)
 
-    # ============================================================
+
+
+# ============================================================
     #   BORRAR BOTÓN
     # ============================================================
 
@@ -348,19 +379,21 @@ class Panels(commands.Cog):
         await interaction.channel.send(embed=embed, view=view)
 
 # ============================================================
-#   SETUP
+#   SETUP FINAL
 # ============================================================
 
 async def setup(bot):
     await bot.add_cog(Panels(bot))
 
     data = cargar_paneles()
+
+    # Registrar vistas persistentes
     for guild_id, guild_panels in data.items():
         for panel_id, panel in guild_panels.items():
 
-            
+            # Botones persistentes
             bot.add_view(VistaPanel(panel_id, panel))
 
-            
+            # Menú persistente
             if "menu" in panel and panel["menu"]:
                 bot.add_view(VistaPanelMenu(panel_id, panel["menu"]))
