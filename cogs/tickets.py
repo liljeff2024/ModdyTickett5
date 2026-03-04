@@ -235,7 +235,6 @@ class BotonCerrarTicket(discord.ui.Button):
                 ephemeral=True
             )
 
-        # Vista para seleccionar quién atendió (solo staff que escribió)
         view = SelectorStaff(cog, canal_id)
 
         await interaction.response.send_message(
@@ -357,6 +356,7 @@ class BotonNotificar(discord.ui.Button):
         await interaction.followup.send("✔ Staff notificado correctamente.", ephemeral=True)
 
 
+
 # ============================================================
 #   BOTÓN CERRAR DEFINITIVO
 # ============================================================
@@ -472,7 +472,7 @@ async def crear_ticket(self, interaction: discord.Interaction, panel_id=None, la
         "reclamado_por": None,
         "reclamado": False,
         "last_notify": 0,
-        "participantes": [user.id],  # 👈 TRACKING DE MENSAJES
+        "participantes": [user.id],
         "timestamp": datetime.datetime.utcnow().isoformat()
     }
     save_json(TICKETS_PATH, tickets)
@@ -496,8 +496,7 @@ async def crear_ticket(self, interaction: discord.Interaction, panel_id=None, la
     await interaction.followup.send(
         f"✔️ {canal.mention} creado correctamente",
         ephemeral=True
-        )
-
+    )
 
 
 # ============================================================
@@ -512,7 +511,7 @@ class ModalRazonCierre(discord.ui.Modal, title="Razón del cierre"):
         max_length=300
     )
 
-    def __init__(self, cog: Tickets):
+    def __init__(self, cog: "Tickets"):
         super().__init__()
         self.cog = cog
 
@@ -524,7 +523,8 @@ class ModalRazonCierre(discord.ui.Modal, title="Razón del cierre"):
         await interaction.response.send_message(
             "✔ Ticket cerrado correctamente.",
             ephemeral=True
-        )
+    )
+
 
 
 # ============================================================
@@ -532,13 +532,13 @@ class ModalRazonCierre(discord.ui.Modal, title="Razón del cierre"):
 # ============================================================
 
 class SelectorStaff(discord.ui.View):
-    def __init__(self, cog: Tickets, canal_id: str):
+    def __init__(self, cog: "Tickets", canal_id: str):
         super().__init__(timeout=None)
         self.add_item(SelectStaff(cog, canal_id))
 
 
 class SelectStaff(discord.ui.Select):
-    def __init__(self, cog: Tickets, canal_id: str):
+    def __init__(self, cog: "Tickets", canal_id: str):
         self.cog = cog
         self.canal_id = canal_id
 
@@ -607,7 +607,7 @@ class SelectStaff(discord.ui.Select):
 # ============================================================
 
 class MenuValoracion(discord.ui.Select):
-    def __init__(self, cog: Tickets, canal_id: str):
+    def __init__(self, cog: "Tickets", canal_id: str):
         opciones = [
             discord.SelectOption(label="⭐ 1", value="1"),
             discord.SelectOption(label="⭐⭐ 2", value="2"),
@@ -654,7 +654,7 @@ class ModalComentarioValoracion(discord.ui.Modal, title="Comentario opcional"):
         max_length=300
     )
 
-    def __init__(self, cog: Tickets, canal_id: str, rating: int):
+    def __init__(self, cog: "Tickets", canal_id: str, rating: int):
         super().__init__()
         self.cog = cog
         self.canal_id = canal_id
@@ -710,7 +710,8 @@ class ModalComentarioValoracion(discord.ui.Modal, title="Comentario opcional"):
         await interaction.response.send_message(
             "⭐ ¡Gracias por tu valoración!",
             ephemeral=True
-    )
+        )
+
 
 
 
@@ -1012,7 +1013,7 @@ def generar_embed_config(guild, config):
 @app_commands.describe(panel_id="ID del panel que quieres configurar")
 async def ticket_config(interaction: discord.Interaction, panel_id: int):
 
-    cog: Tickets = interaction.client.get_cog("Tickets")
+    cog: "Tickets" = interaction.client.get_cog("Tickets")
     if not cog:
         return await interaction.response.send_message(
             "❌ El sistema de tickets no está cargado.",
@@ -1034,6 +1035,96 @@ async def ticket_config(interaction: discord.Interaction, panel_id: int):
 
 
 # ============================================================
+#   CLASE PRINCIPAL TICKETS (AQUÍ, ANTES DEL SETUP)
+# ============================================================
+
+class Tickets(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.config = load_json(CONFIG_PATH)
+
+    # ------------------------------
+    #   CONFIG
+    # ------------------------------
+
+    def get_config(self, guild_id: int, panel_id: int):
+        guild_id = str(guild_id)
+        panel_id = str(panel_id)
+
+        if guild_id not in self.config:
+            self.config[guild_id] = {}
+
+        if panel_id not in self.config[guild_id]:
+            self.config[guild_id][panel_id] = {
+                "staff_roles": [],
+                "categoria_id": None,
+                "logs_id": None,
+                "valoraciones_id": None,
+                "razon_obligatoria": False,
+                "notificar_habilitado": True,
+                "notificar_cooldown": 5
+            }
+
+        return self.config[guild_id][panel_id]
+
+    def save_config(self):
+        save_json(CONFIG_PATH, self.config)
+
+    # ------------------------------
+    #   CIERRE DEFINITIVO (USADO POR MODAL)
+    # ------------------------------
+
+    async def cerrar_definitivo(self, interaction: discord.Interaction, razon: str):
+
+        canal = interaction.channel
+        canal_id = str(canal.id)
+        usuario = interaction.user
+        guild = interaction.guild
+
+        tickets = load_json(TICKETS_PATH)
+        ticket_data = tickets.get(canal_id)
+
+        if not ticket_data:
+            return await interaction.followup.send("❌ No se encontró información del ticket.", ephemeral=True)
+
+        logs_cog = self.bot.get_cog("Logs")
+        if logs_cog:
+            await logs_cog.enviar_log(
+                guild=guild,
+                canal_ticket=canal,
+                ticket_data=ticket_data,
+                razon_cierre=razon,
+                cerrado_por=usuario
+            )
+
+        del tickets[canal_id]
+        save_json(TICKETS_PATH, tickets)
+
+        await canal.delete(reason=f"Ticket cerrado por {usuario} — {razon}")
+
+    # ------------------------------
+    #   TRACKING DE MENSAJES
+    # ------------------------------
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if message.author.bot:
+            return
+
+        canal_id = str(message.channel.id)
+        tickets = load_json(TICKETS_PATH)
+
+        if canal_id not in tickets:
+            return
+
+        ticket = tickets[canal_id]
+
+        if message.author.id not in ticket["participantes"]:
+            ticket["participantes"].append(message.author.id)
+            save_json(TICKETS_PATH, tickets)
+
+
+# ============================================================
 #   SETUP FINAL DEL COG
 # ============================================================
 
@@ -1043,7 +1134,6 @@ async def setup(bot: commands.Bot):
 
     bot.tree.add_command(ticket_config)
 
-    # Registrar vistas persistentes
     bot.add_view(VistaCierreFinal())
 
     print("[Tickets] Sistema de tickets cargado correctamente.")
