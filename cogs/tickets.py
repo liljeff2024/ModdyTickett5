@@ -38,8 +38,7 @@ class SelectRolesStaff(discord.ui.Select):
     def __init__(self, cog, panel_id, roles):
         opciones = [
             discord.SelectOption(label=r.name, value=str(r.id))
-            for r in roles
-            if not r.is_default() and r.name
+            for r in roles if not r.is_default() and r.name
         ]
 
         if not opciones:
@@ -47,20 +46,21 @@ class SelectRolesStaff(discord.ui.Select):
 
         super().__init__(
             placeholder="Selecciona roles staff",
-            min_values=1 if len(opciones) > 1 else 1,
+            min_values=1,
             max_values=min(25, len(opciones)),
-            options=opciones
+            options=opciones,
+            custom_id=f"select_roles_staff_{panel_id}"
         )
 
         self.cog = cog
         self.panel_id = panel_id
 
     async def callback(self, interaction: discord.Interaction):
+
+        await interaction.response.defer(ephemeral=True)
+
         if self.values[0] == "0":
-            return await interaction.response.send_message(
-                "❌ No hay roles válidos para seleccionar.",
-                ephemeral=True
-            )
+            return await interaction.followup.send("❌ No hay roles válidos.", ephemeral=True)
 
         nuevos_roles = [int(v) for v in self.values]
 
@@ -68,10 +68,10 @@ class SelectRolesStaff(discord.ui.Select):
         config["staff_roles"] = nuevos_roles
         self.cog.save_config()
 
-        await interaction.response.send_message(
-            "✔ Roles staff actualizados correctamente.",
-            ephemeral=True
-        )
+        await interaction.followup.send("✔ Roles staff actualizados.", ephemeral=True)
+
+        self.values.clear()
+        await interaction.message.edit(view=self.view)
 
 
 class VistaRolesStaff(discord.ui.View):
@@ -94,18 +94,19 @@ class SelectCategoria(discord.ui.Select):
             placeholder="Selecciona una categoría",
             min_values=1,
             max_values=1,
-            options=opciones
+            options=opciones,
+            custom_id=f"select_categoria_{panel_id}"
         )
 
         self.cog = cog
         self.panel_id = panel_id
 
     async def callback(self, interaction: discord.Interaction):
+
+        await interaction.response.defer(ephemeral=True)
+
         if self.values[0] == "0":
-            return await interaction.response.send_message(
-                "❌ No hay categorías válidas.",
-                ephemeral=True
-            )
+            return await interaction.followup.send("❌ No hay categorías válidas.", ephemeral=True)
 
         categoria_id = int(self.values[0])
 
@@ -113,10 +114,10 @@ class SelectCategoria(discord.ui.Select):
         config["categoria_id"] = categoria_id
         self.cog.save_config()
 
-        await interaction.response.send_message(
-            "✔ Categoría actualizada correctamente.",
-            ephemeral=True
-        )
+        await interaction.followup.send("✔ Categoría actualizada.", ephemeral=True)
+
+        self.values.clear()
+        await interaction.message.edit(view=self.view)
 
 
 class VistaCategoria(discord.ui.View):
@@ -139,18 +140,19 @@ class SelectLogs(discord.ui.Select):
             placeholder="Selecciona canal de logs",
             min_values=1,
             max_values=1,
-            options=opciones
+            options=opciones,
+            custom_id=f"select_logs_{panel_id}"
         )
 
         self.cog = cog
         self.panel_id = panel_id
 
     async def callback(self, interaction: discord.Interaction):
+
+        await interaction.response.defer(ephemeral=True)
+
         if self.values[0] == "0":
-            return await interaction.response.send_message(
-                "❌ No hay canales válidos.",
-                ephemeral=True
-            )
+            return await interaction.followup.send("❌ No hay canales válidos.", ephemeral=True)
 
         logs_id = int(self.values[0])
 
@@ -158,10 +160,10 @@ class SelectLogs(discord.ui.Select):
         config["logs_id"] = logs_id
         self.cog.save_config()
 
-        await interaction.response.send_message(
-            "✔ Canal de logs actualizado correctamente.",
-            ephemeral=True
-        )
+        await interaction.followup.send("✔ Canal de logs actualizado.", ephemeral=True)
+
+        self.values.clear()
+        await interaction.message.edit(view=self.view)
 
 
 class VistaLogs(discord.ui.View):
@@ -179,27 +181,28 @@ class SelectValoraciones(discord.ui.Select):
             placeholder="Selecciona canal de valoraciones",
             min_values=1,
             max_values=1,
-            options=opciones
+            options=opciones,
+            custom_id=f"select_valoraciones_{panel_id}"
         )
 
         self.cog = cog
         self.panel_id = panel_id
 
     async def callback(self, interaction: discord.Interaction):
+
+        await interaction.response.defer(ephemeral=True)
+
         if self.values[0] == "0":
-            return await interaction.response.send_message(
-                "❌ No hay canales válidos.",
-                ephemeral=True
-            )
+            return await interaction.followup.send("❌ No hay canales válidos.", ephemeral=True)
 
         config = self.cog.get_config(interaction.guild.id, self.panel_id)
         config["valoraciones_id"] = int(self.values[0])
         self.cog.save_config()
 
-        await interaction.response.send_message(
-            "✔ Canal de valoraciones actualizado.",
-            ephemeral=True
-            )
+        await interaction.followup.send("✔ Canal de valoraciones actualizado.", ephemeral=True)
+
+        self.values.clear()
+        await interaction.message.edit(view=self.view)
 
 
 
@@ -232,7 +235,7 @@ class BotonCerrarTicket(discord.ui.Button):
                 ephemeral=True
             )
 
-        # Vista para seleccionar quién atendió
+        # Vista para seleccionar quién atendió (solo staff que escribió)
         view = SelectorStaff(cog, canal_id)
 
         await interaction.response.send_message(
@@ -251,22 +254,18 @@ class BotonReclamar(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        canal_id = str(interaction.channel.id)
 
+        await interaction.response.defer(ephemeral=True)
+
+        canal_id = str(interaction.channel.id)
         tickets = load_json(TICKETS_PATH)
         ticket = tickets.get(canal_id)
 
         if not ticket:
-            return await interaction.response.send_message(
-                "❌ Este canal no es un ticket.",
-                ephemeral=True
-            )
+            return await interaction.followup.send("❌ Este canal no es un ticket.", ephemeral=True)
 
         if ticket.get("reclamado", False):
-            return await interaction.response.send_message(
-                "❌ Este ticket ya ha sido reclamado.",
-                ephemeral=True
-            )
+            return await interaction.followup.send("❌ Este ticket ya ha sido reclamado.", ephemeral=True)
 
         ticket["reclamado"] = True
         ticket["reclamado_por"] = interaction.user.id
@@ -283,16 +282,12 @@ class BotonReclamar(discord.ui.Button):
         )
         await interaction.channel.send(embed=embed)
 
-        # Actualizar botón
         self.disabled = True
         self.style = discord.ButtonStyle.gray
         self.label = "📌 Ticket reclamado"
         await interaction.message.edit(view=self.view)
 
-        await interaction.response.send_message(
-            "✔ Ticket reclamado correctamente.",
-            ephemeral=True
-        )
+        await interaction.followup.send("✔ Ticket reclamado correctamente.", ephemeral=True)
 
 
 class BotonNotificar(discord.ui.Button):
@@ -304,23 +299,19 @@ class BotonNotificar(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        canal_id = str(interaction.channel.id)
 
+        await interaction.response.defer(ephemeral=True)
+
+        canal_id = str(interaction.channel.id)
         tickets = load_json(TICKETS_PATH)
         ticket = tickets.get(canal_id)
 
         if not ticket:
-            return await interaction.response.send_message(
-                "❌ Este canal no es un ticket.",
-                ephemeral=True
-            )
+            return await interaction.followup.send("❌ Este canal no es un ticket.", ephemeral=True)
 
         cog = interaction.client.get_cog("Tickets")
         if not cog:
-            return await interaction.response.send_message(
-                "❌ El sistema de tickets no está disponible.",
-                ephemeral=True
-            )
+            return await interaction.followup.send("❌ El sistema de tickets no está disponible.", ephemeral=True)
 
         config = cog.get_config(interaction.guild.id, ticket["panel_id"])
 
@@ -335,7 +326,7 @@ class BotonNotificar(discord.ui.Button):
             minutos = restante // 60
             segundos = restante % 60
 
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 f"⏳ Debes esperar **{minutos}m {segundos}s** para volver a notificar al staff.",
                 ephemeral=True
             )
@@ -363,10 +354,7 @@ class BotonNotificar(discord.ui.Button):
 
         await interaction.channel.send(embed=embed)
 
-        await interaction.response.send_message(
-            "✔ Staff notificado correctamente.",
-            ephemeral=True
-        )
+        await interaction.followup.send("✔ Staff notificado correctamente.", ephemeral=True)
 
 
 # ============================================================
@@ -383,6 +371,9 @@ class BotonCerrarDefinitivo(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
+
+        await interaction.response.defer(ephemeral=True)
+
         canal = interaction.channel
         canal_id = str(canal.id)
         usuario = interaction.user
@@ -392,10 +383,7 @@ class BotonCerrarDefinitivo(discord.ui.Button):
         ticket_data = tickets.get(canal_id)
 
         if not ticket_data:
-            return await interaction.response.send_message(
-                "❌ No se encontró información del ticket.",
-                ephemeral=True
-            )
+            return await interaction.followup.send("❌ No se encontró información del ticket.", ephemeral=True)
 
         logs_cog = interaction.client.get_cog("Logs")
         if logs_cog:
@@ -410,10 +398,7 @@ class BotonCerrarDefinitivo(discord.ui.Button):
         del tickets[canal_id]
         save_json(TICKETS_PATH, tickets)
 
-        await interaction.response.send_message(
-            "✔ Ticket cerrado definitivamente.",
-            ephemeral=True
-        )
+        await interaction.followup.send("✔ Ticket cerrado definitivamente.", ephemeral=True)
 
         await canal.delete(reason=f"Ticket cerrado por {usuario}")
 
@@ -444,117 +429,75 @@ class VistaCierreFinal(discord.ui.View):
 
 
 # ============================================================
-#   COG PRINCIPAL
+#   CREAR TICKET (CON TRACKING DE MENSAJES)
 # ============================================================
 
-class Tickets(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.config = load_json(CONFIG_PATH)
+async def crear_ticket(self, interaction: discord.Interaction, panel_id=None, label=None, emoji=None):
 
-    # ============================================================
-    #   GUARDAR CONFIG
-    # ============================================================
-    def save_config(self):
-        save_json(CONFIG_PATH, self.config)
-        self.config = load_json(CONFIG_PATH)
+    await interaction.response.defer(ephemeral=True)
 
-    # ============================================================
-    #   OBTENER CONFIG (EL QUE TE FALTABA)
-    # ============================================================
-    def get_config(self, guild_id, panel_id):
-        guild = str(guild_id)
-        pid = str(panel_id)
+    guild = interaction.guild
+    user = interaction.user
 
-        # Crear estructura si no existe
-        if guild not in self.config:
-            self.config[guild] = {}
+    config = self.get_config(guild.id, panel_id)
+    categoria = guild.get_channel(config["categoria_id"]) if config["categoria_id"] else None
 
-        if pid not in self.config[guild]:
-            self.config[guild][pid] = {
-                "staff_roles": [],
-                "categoria_id": None,
-                "logs_id": None,
-                "valoraciones_id": None,
-                "razon_obligatoria": True,
-                "notificar_habilitado": True,
-                "notificar_cooldown": 5
-            }
-            self.save_config()
+    nombre_canal = f"ticket-{user.name}".replace(" ", "-")[:90]
 
-        return self.config[guild][pid]
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
+    }
 
+    for rol_id in config["staff_roles"]:
+        rol = guild.get_role(rol_id)
+        if rol:
+            overwrites[rol] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True
+            )
 
+    canal = await guild.create_text_channel(
+        nombre_canal,
+        category=categoria,
+        overwrites=overwrites
+    )
 
-# ============================================================
-    #   CREAR TICKET
-    # ============================================================
-    async def crear_ticket(self, interaction: discord.Interaction, panel_id=None, label=None, emoji=None):
+    tickets = load_json(TICKETS_PATH)
+    tickets[str(canal.id)] = {
+        "guild_id": guild.id,
+        "usuario_id": user.id,
+        "panel_id": panel_id,
+        "reclamado_por": None,
+        "reclamado": False,
+        "last_notify": 0,
+        "participantes": [user.id],  # 👈 TRACKING DE MENSAJES
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    }
+    save_json(TICKETS_PATH, tickets)
 
-        await interaction.response.defer(ephemeral=True)
+    roles_staff = [guild.get_role(r) for r in config["staff_roles"] if guild.get_role(r)]
+    menciones = " ".join(r.mention for r in roles_staff) if roles_staff else ""
 
-        guild = interaction.guild
-        user = interaction.user
+    embed = discord.Embed(
+        title="🎫 Nuevo ticket abierto",
+        description=(
+            f"👤 **Usuario:** {user.mention}\n"
+            f"📌 **Tipo:** {emoji or ''} {label or 'Ticket'}\n"
+            f"🔔 **Staff notificado:** {menciones or '—'}"
+        ),
+        color=discord.Color.green()
+    )
 
-        config = self.get_config(guild.id, panel_id)
-        categoria = guild.get_channel(config["categoria_id"]) if config["categoria_id"] else None
+    view = VistaTicket(config)
+    await canal.send(embed=embed, view=view)
 
-        nombre_canal = f"ticket-{user.name}".replace(" ", "-")[:90]
-
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
-        }
-
-        for rol_id in config["staff_roles"]:
-            rol = guild.get_role(rol_id)
-            if rol:
-                overwrites[rol] = discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True
-                )
-
-        canal = await guild.create_text_channel(
-            nombre_canal,
-            category=categoria,
-            overwrites=overwrites
+    await interaction.followup.send(
+        f"✔️ {canal.mention} creado correctamente",
+        ephemeral=True
         )
 
-        tickets = load_json(TICKETS_PATH)
-        tickets[str(canal.id)] = {
-            "guild_id": guild.id,
-            "usuario_id": user.id,
-            "panel_id": panel_id,
-            "reclamado_por": None,
-            "reclamado": False,
-            "last_notify": 0,
-            "timestamp": datetime.datetime.utcnow().isoformat()
-        }
-        save_json(TICKETS_PATH, tickets)
-
-        roles_staff = [guild.get_role(r) for r in config["staff_roles"] if guild.get_role(r)]
-        menciones = " ".join(r.mention for r in roles_staff) if roles_staff else ""
-
-        await canal.send(f"{user.mention} {menciones}")
-
-        embed = discord.Embed(
-            title="🎫 Nuevo ticket abierto",
-            description=(
-                f"👤 **Usuario:** {user.mention}\n"
-                f"📌 **Tipo:** {emoji or ''} {label or 'Ticket'}\n"
-                f"🔔 **Staff notificado:** {menciones or '—'}"
-            ),
-            color=discord.Color.green()
-        )
-
-        view = VistaTicket(config)
-        await canal.send(embed=embed, view=view)
-
-        await interaction.followup.send(
-            f"✔️ {canal.mention} creado correctamente",
-            ephemeral=True
-        )
 
 
 # ============================================================
@@ -585,7 +528,7 @@ class ModalRazonCierre(discord.ui.Modal, title="Razón del cierre"):
 
 
 # ============================================================
-#   SELECTOR “¿QUIÉN TE ATENDIÓ?”
+#   SELECTOR “¿QUIÉN TE ATENDIÓ?” (SOLO STAFF QUE ESCRIBIÓ)
 # ============================================================
 
 class SelectorStaff(discord.ui.View):
@@ -599,28 +542,47 @@ class SelectStaff(discord.ui.Select):
         self.cog = cog
         self.canal_id = canal_id
 
-        ticket = load_json(TICKETS_PATH)[canal_id]
+        tickets = load_json(TICKETS_PATH)
+        ticket = tickets.get(canal_id)
+
+        guild = cog.bot.get_guild(ticket["guild_id"])
         config = cog.get_config(ticket["guild_id"], ticket["panel_id"])
 
-        opciones = []
-        guild = cog.bot.get_guild(ticket["guild_id"])
+        participantes = ticket.get("participantes", [])
 
+        opciones = []
+
+        # SOLO staff configurado + que escribió en el ticket
         for rol_id in config["staff_roles"]:
             rol = guild.get_role(rol_id)
-            if rol:
-                for m in rol.members:
-                    opciones.append(discord.SelectOption(label=m.name, value=str(m.id)))
+            if not rol:
+                continue
+
+            for miembro in rol.members:
+                if miembro.id in participantes:
+                    opciones.append(
+                        discord.SelectOption(
+                            label=miembro.name,
+                            value=str(miembro.id)
+                        )
+                    )
 
         if not opciones:
-            opciones = [discord.SelectOption(label="No hay staff disponible", value="0")]
+            opciones = [discord.SelectOption(label="No hay staff que haya participado", value="0")]
 
-        super().__init__(placeholder="Selecciona quién te atendió", options=opciones)
+        super().__init__(
+            placeholder="Selecciona quién te atendió",
+            options=opciones,
+            custom_id=f"select_staff_{canal_id}"
+        )
 
     async def callback(self, interaction: discord.Interaction):
 
+        await interaction.response.defer(ephemeral=True)
+
         if self.values[0] == "0":
-            return await interaction.response.send_message(
-                "❌ No hay miembros de staff disponibles.",
+            return await interaction.followup.send(
+                "❌ Ningún miembro de staff participó en este ticket.",
                 ephemeral=True
             )
 
@@ -628,10 +590,7 @@ class SelectStaff(discord.ui.Select):
         tickets[self.canal_id]["reclamado_por"] = int(self.values[0])
         save_json(TICKETS_PATH, tickets)
 
-        await interaction.response.send_message(
-            "✔ Staff registrado.",
-            ephemeral=True
-        )
+        await interaction.followup.send("✔ Staff registrado.", ephemeral=True)
 
         view = discord.ui.View(timeout=None)
         view.add_item(MenuValoracion(self.cog, self.canal_id))
@@ -656,11 +615,18 @@ class MenuValoracion(discord.ui.Select):
             discord.SelectOption(label="⭐⭐⭐⭐ 4", value="4"),
             discord.SelectOption(label="⭐⭐⭐⭐⭐ 5", value="5"),
         ]
-        super().__init__(placeholder="Valora la atención recibida", options=opciones)
+        super().__init__(
+            placeholder="Valora la atención recibida",
+            options=opciones,
+            custom_id=f"menu_valoracion_{canal_id}"
+        )
         self.cog = cog
         self.canal_id = canal_id
 
     async def callback(self, interaction: discord.Interaction):
+
+        await interaction.response.defer(ephemeral=True)
+
         rating = int(self.values[0])
 
         ratings = load_json(RATINGS_PATH)
@@ -677,7 +643,7 @@ class MenuValoracion(discord.ui.Select):
         save_json(RATINGS_PATH, ratings)
 
         modal = ModalComentarioValoracion(self.cog, self.canal_id, rating)
-        await interaction.response.send_modal(modal)
+        await interaction.followup.send_modal(modal)
 
 
 class ModalComentarioValoracion(discord.ui.Modal, title="Comentario opcional"):
@@ -695,6 +661,7 @@ class ModalComentarioValoracion(discord.ui.Modal, title="Comentario opcional"):
         self.rating = rating
 
     async def on_submit(self, interaction: discord.Interaction):
+
         ratings = load_json(RATINGS_PATH)
 
         if self.canal_id not in ratings:
@@ -713,6 +680,7 @@ class ModalComentarioValoracion(discord.ui.Modal, title="Comentario opcional"):
 
         tickets = load_json(TICKETS_PATH)
         ticket = tickets.get(self.canal_id)
+
         if ticket:
             config = self.cog.get_config(interaction.guild.id, ticket["panel_id"])
 
@@ -729,7 +697,7 @@ class ModalComentarioValoracion(discord.ui.Modal, title="Comentario opcional"):
 
                     staff_id = ticket.get("reclamado_por")
                     if staff_id:
-                        embed.add_field(name="Staff atendió", value=f"<@{staff_id}>")
+                        embed.add_field(name="Staff que atendió", value=f"<@{staff_id}>")
 
                     embed.add_field(
                         name="Comentario",
@@ -742,7 +710,7 @@ class ModalComentarioValoracion(discord.ui.Modal, title="Comentario opcional"):
         await interaction.response.send_message(
             "⭐ ¡Gracias por tu valoración!",
             ephemeral=True
-        )
+    )
 
 
 
@@ -878,109 +846,6 @@ class BotonConfigRazon(discord.ui.Button):
 
 
 # ============================================================
-#   VISTA CONFIG (PERSISTENTE Y CORREGIDA)
-# ============================================================
-
-class VistaConfig(discord.ui.View):
-    def __init__(self, cog, panel_id, guild_id):
-        super().__init__(timeout=None)
-        self.cog = cog
-        self.panel_id = panel_id
-        self.guild_id = guild_id
-
-        self.add_item(BotonConfigRoles(cog, panel_id))
-        self.add_item(BotonConfigCategoria(cog, panel_id))
-        self.add_item(BotonConfigLogs(cog, panel_id))
-        self.add_item(BotonConfigValoraciones(cog, panel_id))
-        self.add_item(BotonConfigRazon(cog, panel_id))
-
-        self.add_item(BotonToggleNotificar(cog, panel_id, guild_id))
-        self.add_item(BotonCambiarCooldown(cog, panel_id, guild_id))
-
-
-# ============================================================
-#   COMANDO /ticket_config
-# ============================================================
-
-@app_commands.command(name="ticket_config", description="Configura un panel de tickets.")
-@app_commands.describe(panel_id="ID del panel que quieres configurar")
-async def ticket_config(interaction: discord.Interaction, panel_id: int):
-
-    cog: Tickets = interaction.client.get_cog("Tickets")
-    if not cog:
-        return await interaction.response.send_message(
-            "❌ El sistema de tickets no está cargado.",
-            ephemeral=True
-        )
-
-    await interaction.response.send_message("Cargando configuración...", ephemeral=True)
-
-    config = cog.get_config(interaction.guild.id, panel_id)
-
-    embed = generar_embed_config(interaction.guild, config)
-    view = VistaConfig(cog, panel_id, interaction.guild.id)
-
-    await interaction.edit_original_response(
-        content=None,
-        embed=embed,
-        view=view
-    )
-
-
-# ============================================================
-#   GENERADOR DE EMBED
-# ============================================================
-
-def generar_embed_config(guild, config):
-
-    estado_notificar = "Activado" if config.get("notificar_habilitado", True) else "Desactivado"
-    cooldown = config.get("notificar_cooldown", 5)
-
-    embed = discord.Embed(
-        title="⚙ Configuración del Panel de Tickets",
-        color=discord.Color.blue()
-    )
-
-    embed.add_field(
-        name="Roles staff",
-        value=", ".join([f"<@&{r}>" for r in config['staff_roles']]) or "—",
-        inline=False
-    )
-    embed.add_field(
-        name="Categoría",
-        value=f"<#{config['categoria_id']}>" if config["categoria_id"] else "—",
-        inline=False
-    )
-    embed.add_field(
-        name="Canal de logs",
-        value=f"<#{config['logs_id']}>" if config["logs_id"] else "—",
-        inline=False
-    )
-    embed.add_field(
-        name="Canal de valoraciones",
-        value=f"<#{config['valoraciones_id']}>" if config["valoraciones_id"] else "—",
-        inline=False
-    )
-    embed.add_field(
-        name="Razón obligatoria",
-        value="Sí" if config["razon_obligatoria"] else "No",
-        inline=False
-    )
-    embed.add_field(
-        name="Notificar staff",
-        value=estado_notificar,
-        inline=False
-    )
-    embed.add_field(
-        name="Cooldown de notificación",
-        value=f"{cooldown} minutos",
-        inline=False
-    )
-
-    return embed
-
-
-# ============================================================
 #   BOTÓN ACTIVAR / DESACTIVAR NOTIFICAR STAFF
 # ============================================================
 
@@ -1063,6 +928,109 @@ class CooldownModal(discord.ui.Modal, title="Cambiar Cooldown"):
         nueva_vista = VistaConfig(self.cog, self.panel_id, self.guild_id)
 
         await interaction.response.edit_message(embed=nuevo_embed, view=nueva_vista)
+
+
+# ============================================================
+#   VISTA CONFIG (PERSISTENTE)
+# ============================================================
+
+class VistaConfig(discord.ui.View):
+    def __init__(self, cog, panel_id, guild_id):
+        super().__init__(timeout=None)
+        self.cog = cog
+        self.panel_id = panel_id
+        self.guild_id = guild_id
+
+        self.add_item(BotonConfigRoles(cog, panel_id))
+        self.add_item(BotonConfigCategoria(cog, panel_id))
+        self.add_item(BotonConfigLogs(cog, panel_id))
+        self.add_item(BotonConfigValoraciones(cog, panel_id))
+        self.add_item(BotonConfigRazon(cog, panel_id))
+
+        self.add_item(BotonToggleNotificar(cog, panel_id, guild_id))
+        self.add_item(BotonCambiarCooldown(cog, panel_id, guild_id))
+
+
+# ============================================================
+#   GENERADOR DE EMBED DE CONFIG
+# ============================================================
+
+def generar_embed_config(guild, config):
+
+    estado_notificar = "Activado" if config.get("notificar_habilitado", True) else "Desactivado"
+    cooldown = config.get("notificar_cooldown", 5)
+
+    embed = discord.Embed(
+        title="⚙ Configuración del Panel de Tickets",
+        color=discord.Color.blue()
+    )
+
+    embed.add_field(
+        name="Roles staff",
+        value=", ".join([f"<@&{r}>" for r in config['staff_roles']]) or "—",
+        inline=False
+    )
+    embed.add_field(
+        name="Categoría",
+        value=f"<#{config['categoria_id']}>" if config["categoria_id"] else "—",
+        inline=False
+    )
+    embed.add_field(
+        name="Canal de logs",
+        value=f"<#{config['logs_id']}>" if config["logs_id"] else "—",
+        inline=False
+    )
+    embed.add_field(
+        name="Canal de valoraciones",
+        value=f"<#{config['valoraciones_id']}>" if config["valoraciones_id"] else "—",
+        inline=False
+    )
+    embed.add_field(
+        name="Razón obligatoria",
+        value="Sí" if config["razon_obligatoria"] else "No",
+        inline=False
+    )
+    embed.add_field(
+        name="Notificar staff",
+        value=estado_notificar,
+        inline=False
+    )
+    embed.add_field(
+        name="Cooldown de notificación",
+        value=f"{cooldown} minutos",
+        inline=False
+    )
+
+    return embed
+
+
+# ============================================================
+#   COMANDO /ticket_config
+# ============================================================
+
+@app_commands.command(name="ticket_config", description="Configura un panel de tickets.")
+@app_commands.describe(panel_id="ID del panel que quieres configurar")
+async def ticket_config(interaction: discord.Interaction, panel_id: int):
+
+    cog: Tickets = interaction.client.get_cog("Tickets")
+    if not cog:
+        return await interaction.response.send_message(
+            "❌ El sistema de tickets no está cargado.",
+            ephemeral=True
+        )
+
+    await interaction.response.send_message("Cargando configuración...", ephemeral=True)
+
+    config = cog.get_config(interaction.guild.id, panel_id)
+
+    embed = generar_embed_config(interaction.guild, config)
+    view = VistaConfig(cog, panel_id, interaction.guild.id)
+
+    await interaction.edit_original_response(
+        content=None,
+        embed=embed,
+        view=view
+    )
 
 
 # ============================================================
